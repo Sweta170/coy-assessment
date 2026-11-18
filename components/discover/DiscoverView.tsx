@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Flame, Heart, Shield, RefreshCw } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Flame, Heart } from 'lucide-react';
 import { CardStack } from './CardStack';
-import { MatchesList } from './MatchesList';
+import { MatchesGrid } from './MatchesGrid';
 import { MatchOverlay } from './MatchOverlay';
-import { ProfileDetailModal } from './ProfileDetailModal';
+import { ProfileSheet } from './ProfileSheet';
 import { ToastContainer, ToastMessage } from '../ui/Toast';
 import { MatchItem, PublicProfile } from '@/lib/matching/validation';
 
@@ -20,10 +21,11 @@ export function DiscoverView() {
   // Active celebration modal
   const [matchedProfile, setMatchedProfile] = useState<PublicProfile | null>(null);
 
-  // Profile detail modal
+  // Active profile sheet
   const [selectedProfile, setSelectedProfile] = useState<PublicProfile | null>(null);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
 
-  // Toasts
+  // Toast notifications
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   const addToast = useCallback((message: string, type: 'error' | 'success' | 'info') => {
@@ -31,7 +33,7 @@ export function DiscoverView() {
     setToasts((prev) => [...prev, { id, message, type }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 4500);
+    }, 4000);
   }, []);
 
   const dismissToast = useCallback((id: string) => {
@@ -92,42 +94,65 @@ export function DiscoverView() {
     await fetchMatches();
   };
 
+  const handleOpenSheet = (profile: PublicProfile) => {
+    setSelectedProfile(profile);
+    setIsSheetOpen(true);
+  };
+
+  const handleCloseSheet = () => {
+    setIsSheetOpen(false);
+  };
+
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden">
+    <div className="flex-1 flex flex-col h-full overflow-hidden relative">
       {/* Toast notifications */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
 
-      {/* Discover Sub-view Navigation Bar */}
-      <div className="shrink-0 px-4 pt-2 pb-1 max-w-md w-full mx-auto">
-        <div className="flex items-center justify-between p-1 bg-slate-900/90 rounded-2xl border border-white/10 shadow-inner">
+      {/* Discover Sub-view Segmented Switcher */}
+      <div className="shrink-0 px-4 pt-2 pb-1 max-w-sm w-full mx-auto z-20">
+        <div className="relative flex items-center justify-between p-1 bg-[#12151E] rounded-2xl border border-white/[0.08] shadow-inner">
+          {/* Swipe Tab Button */}
           <button
+            type="button"
             onClick={() => setSubView('swipe')}
-            className={`flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-200 ${
-              subView === 'swipe'
-                ? 'bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200'
+            className={`relative flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-colors duration-150 z-10 ${
+              subView === 'swipe' ? 'text-white' : 'text-coy-muted hover:text-slate-200'
             }`}
           >
-            <Flame className="w-4 h-4" />
-            <span>Swipe Deck</span>
+            {subView === 'swipe' && (
+              <motion.div
+                layoutId="subViewPill"
+                transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+                className="absolute inset-0 bg-gradient-to-r from-coy-primary to-pink-500 rounded-xl shadow-coy-primary"
+              />
+            )}
+            <Flame className="w-4 h-4 z-10" />
+            <span className="z-10">Discover</span>
           </button>
 
+          {/* Matches Tab Button */}
           <button
+            type="button"
             onClick={() => setSubView('matches')}
-            className={`flex-1 py-2 px-3 rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-200 ${
-              subView === 'matches'
-                ? 'bg-gradient-to-r from-rose-500 to-pink-500 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200'
+            className={`relative flex-1 py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-colors duration-150 z-10 ${
+              subView === 'matches' ? 'text-white' : 'text-coy-muted hover:text-slate-200'
             }`}
           >
-            <Heart className="w-4 h-4 fill-current" />
-            <span>Matches</span>
+            {subView === 'matches' && (
+              <motion.div
+                layoutId="subViewPill"
+                transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+                className="absolute inset-0 bg-gradient-to-r from-coy-primary to-pink-500 rounded-xl shadow-coy-primary"
+              />
+            )}
+            <Heart className="w-4 h-4 fill-current z-10" />
+            <span className="z-10">Matches</span>
             {matches.length > 0 && (
               <span
-                className={`ml-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                className={`z-10 px-1.5 py-0.2 rounded-full text-[10px] font-black transition-colors ${
                   subView === 'matches'
-                    ? 'bg-white text-rose-600'
-                    : 'bg-rose-500 text-white'
+                    ? 'bg-white text-coy-primary'
+                    : 'bg-coy-primary text-white'
                 }`}
               >
                 {matches.length}
@@ -148,13 +173,13 @@ export function DiscoverView() {
             onRefreshFeed={fetchFeed}
             onResetDb={handleResetDb}
             onShowToast={addToast}
-            onOpenDetails={(profile) => setSelectedProfile(profile)}
+            onOpenDetails={handleOpenSheet}
           />
         ) : (
-          <MatchesList
+          <MatchesGrid
             matches={matches}
             isLoading={isLoadingMatches}
-            onSelectMatch={(match) => setSelectedProfile(match)}
+            onSelectMatch={handleOpenSheet}
             onSwitchToSwipe={() => setSubView('swipe')}
           />
         )}
@@ -170,10 +195,12 @@ export function DiscoverView() {
         }}
       />
 
-      {/* Profile Detail Modal */}
-      <ProfileDetailModal
+      {/* Bottom Profile Sheet */}
+      <ProfileSheet
         profile={selectedProfile}
-        onClose={() => setSelectedProfile(null)}
+        isOpen={isSheetOpen}
+        onClose={handleCloseSheet}
+        showActions={subView === 'swipe'}
       />
     </div>
   );

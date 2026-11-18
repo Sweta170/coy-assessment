@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion, useMotionValue, useTransform, PanInfo } from 'framer-motion';
-import { MapPin, Info, Heart, X, Sparkles } from 'lucide-react';
+import { MapPin, Heart, X, ChevronUp } from 'lucide-react';
 import { PublicProfile } from '@/lib/matching/validation';
 
 interface SwipeCardProps {
@@ -10,6 +10,7 @@ interface SwipeCardProps {
   isTop: boolean;
   onSwipe: (direction: 'like' | 'pass') => void;
   onOpenDetails: (profile: PublicProfile) => void;
+  dragX?: ReturnType<typeof useMotionValue<number>>;
 }
 
 export function SwipeCard({
@@ -17,42 +18,61 @@ export function SwipeCard({
   isTop,
   onSwipe,
   onOpenDetails,
+  dragX,
 }: SwipeCardProps) {
-  const x = useMotionValue(0);
-  const rotate = useTransform(x, [-200, 200], [-18, 18]);
+  // Motion values for top card physics
+  const fallbackX = useMotionValue(0);
+  const activeX = dragX || fallbackX;
 
-  // Opacities for LIKE and PASS overlay badges
-  const likeOpacity = useTransform(x, [20, 100], [0, 1]);
-  const passOpacity = useTransform(x, [-20, -100], [0, 1]);
+  // Rotation: tilts up to 15 degrees in proportion to drag
+  const rotate = useTransform(activeX, [-260, 260], [-15, 15]);
+
+  // Live feedback stamps: fade in linearly from 15px to 85px displacement
+  const likeOpacity = useTransform(activeX, [15, 85], [0, 1]);
+  const nopeOpacity = useTransform(activeX, [-15, -85], [0, 1]);
+
+  // Dynamic ambient background glow tint tied to drag direction & distance
+  const ambientGlow = useTransform(
+    activeX,
+    [-180, 0, 180],
+    [
+      'radial-gradient(circle at 100% 50%, rgba(244, 63, 94, 0.28) 0%, transparent 70%)',
+      'radial-gradient(circle, transparent 0%, transparent 100%)',
+      'radial-gradient(circle at 0% 50%, rgba(16, 185, 129, 0.28) 0%, transparent 70%)',
+    ]
+  );
 
   const handleDragEnd = (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    const threshold = 100;
-    const velocityThreshold = 400;
+    const threshold = 110;
+    const velocityThreshold = 450;
 
     if (info.offset.x > threshold || info.velocity.x > velocityThreshold) {
+      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(15);
       onSwipe('like');
     } else if (info.offset.x < -threshold || info.velocity.x < -velocityThreshold) {
+      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10);
       onSwipe('pass');
     }
   };
 
   if (!isTop) {
-    // Background card (stack hint)
+    // Underneath card (Stack hint)
     return (
-      <div className="absolute inset-0 select-none pointer-events-none rounded-3xl overflow-hidden shadow-xl border border-white/5 bg-[#12161F]">
+      <div className="absolute inset-0 select-none pointer-events-none rounded-4xl overflow-hidden shadow-coy-card bg-[#11141D] border border-white/5">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={profile.photo}
           alt={profile.name}
-          className="w-full h-full object-cover filter brightness-[0.7] blur-[0.5px]"
+          className="w-full h-full object-cover filter brightness-[0.7] blur-[0.2px]"
+          draggable={false}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
         <div className="absolute bottom-6 left-6 right-6">
           <div className="flex items-baseline gap-2">
-            <h3 className="text-2xl font-bold text-white/90">{profile.name}</h3>
-            <span className="text-xl text-white/60">{profile.age}</span>
+            <h3 className="font-display text-2xl font-bold text-white/90">{profile.name}</h3>
+            <span className="font-display text-xl text-coy-sand/60">{profile.age}</span>
           </div>
-          <p className="text-xs text-white/60 flex items-center gap-1 mt-1">
+          <p className="text-xs text-coy-sand/60 flex items-center gap-1.5 mt-1 font-medium">
             <MapPin className="w-3.5 h-3.5" />
             {profile.city}
           </p>
@@ -63,13 +83,14 @@ export function SwipeCard({
 
   return (
     <motion.div
-      style={{ x, rotate }}
+      style={{ x: activeX, rotate }}
       drag="x"
       dragConstraints={{ left: 0, right: 0 }}
-      dragElastic={0.8}
+      dragElastic={0.85}
       onDragEnd={handleDragEnd}
       whileTap={{ cursor: 'grabbing' }}
-      className="absolute inset-0 cursor-grab active:cursor-grabbing select-none rounded-3xl overflow-hidden shadow-2xl border border-white/10 bg-[#12161F] touch-none z-10"
+      onClick={() => onOpenDetails(profile)}
+      className="absolute inset-0 cursor-grab active:cursor-grabbing select-none rounded-4xl overflow-hidden shadow-coy-card bg-[#11141D] border border-white/10 touch-none z-10 group"
     >
       {/* Profile Photo */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -80,56 +101,65 @@ export function SwipeCard({
         draggable={false}
       />
 
-      {/* Top Vignette & Gradients */}
-      <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E14] via-black/20 to-black/30 pointer-events-none" />
+      {/* Dynamic Ambient Color Scrim (Tied to live drag distance) */}
+      <motion.div
+        style={{ background: ambientGlow }}
+        className="absolute inset-0 pointer-events-none z-10 transition-colors"
+      />
+
+      {/* Multi-stop Bottom Scrim Gradient for WCAG AA Text Contrast */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 via-black/15 to-transparent pointer-events-none" />
 
       {/* LIKE Stamp Badge */}
       <motion.div
         style={{ opacity: likeOpacity }}
-        className="absolute top-8 left-8 z-30 pointer-events-none px-4 py-2 border-4 border-emerald-400 text-emerald-400 font-black text-2xl tracking-wider rounded-2xl -rotate-12 bg-black/40 backdrop-blur-sm flex items-center gap-2 shadow-lg"
+        className="absolute top-8 left-7 z-30 pointer-events-none px-4 py-2 border-[3px] border-coy-like text-coy-like font-black font-sans text-xl tracking-wider rounded-2xl -rotate-12 bg-black/50 backdrop-blur-md flex items-center gap-2 shadow-coy-like"
       >
-        <Heart className="w-6 h-6 fill-emerald-400" />
+        <Heart className="w-5 h-5 fill-coy-like" />
         LIKE
       </motion.div>
 
-      {/* PASS Stamp Badge */}
+      {/* NOPE Stamp Badge */}
       <motion.div
-        style={{ opacity: passOpacity }}
-        className="absolute top-8 right-8 z-30 pointer-events-none px-4 py-2 border-4 border-rose-500 text-rose-500 font-black text-2xl tracking-wider rounded-2xl rotate-12 bg-black/40 backdrop-blur-sm flex items-center gap-2 shadow-lg"
+        style={{ opacity: nopeOpacity }}
+        className="absolute top-8 right-7 z-30 pointer-events-none px-4 py-2 border-[3px] border-coy-nope text-coy-nope font-black font-sans text-xl tracking-wider rounded-2xl rotate-12 bg-black/50 backdrop-blur-md flex items-center gap-2 shadow-coy-nope"
       >
-        <X className="w-6 h-6 stroke-[3]" />
-        PASS
+        <X className="w-5 h-5 stroke-[3]" />
+        NOPE
       </motion.div>
 
-      {/* Info Icon Button (top right) */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onOpenDetails(profile);
-        }}
-        className="absolute top-4 right-4 z-20 w-10 h-10 rounded-full bg-black/50 backdrop-blur-md border border-white/10 flex items-center justify-center text-white/80 hover:text-white hover:bg-black/70 transition shadow-md"
-        aria-label="View profile info"
-      >
-        <Info className="w-5 h-5" />
-      </button>
+      {/* Expand Sheet Pill Hint (Top Right) */}
+      <div className="absolute top-4 right-4 z-20">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenDetails(profile);
+          }}
+          className="px-3 py-1.5 rounded-full bg-black/50 hover:bg-black/75 backdrop-blur-md border border-white/15 text-white/80 hover:text-white text-xs font-medium flex items-center gap-1.5 transition-all shadow-md group-hover:border-white/30"
+          aria-label="Expand profile"
+        >
+          <span>Bio</span>
+          <ChevronUp className="w-3.5 h-3.5 transition-transform group-hover:-translate-y-0.5" />
+        </button>
+      </div>
 
       {/* Profile Details at bottom */}
-      <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-6 text-white pointer-events-none">
+      <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-6 text-white pointer-events-none z-20">
         <div className="flex items-baseline gap-2.5">
-          <h2 className="text-3xl font-bold tracking-tight text-white drop-shadow">
+          <h2 className="font-display text-3xl font-bold tracking-tight text-white drop-shadow-md">
             {profile.name}
           </h2>
-          <span className="text-2xl font-light text-slate-300 drop-shadow">
+          <span className="font-display text-2xl font-light text-coy-sand drop-shadow-sm">
             {profile.age}
           </span>
         </div>
 
-        <div className="flex items-center gap-1.5 text-xs text-slate-300 font-medium mt-1">
-          <MapPin className="w-3.5 h-3.5 text-rose-400" />
+        <div className="flex items-center gap-1.5 text-xs text-coy-sand/90 font-medium mt-1">
+          <MapPin className="w-3.5 h-3.5 text-coy-primary shrink-0" />
           <span>{profile.city}</span>
         </div>
 
-        <p className="text-xs sm:text-sm text-slate-200 mt-2.5 line-clamp-2 leading-relaxed drop-shadow-sm font-normal">
+        <p className="text-xs sm:text-sm text-slate-200 mt-2.5 line-clamp-2 leading-relaxed font-normal text-slate-200/90">
           {profile.bio}
         </p>
 
@@ -138,13 +168,13 @@ export function SwipeCard({
           {profile.interests.slice(0, 3).map((interest) => (
             <span
               key={interest}
-              className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-black/40 backdrop-blur-md border border-white/15 text-slate-200"
+              className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-white/[0.08] backdrop-blur-md border border-white/10 text-slate-200 shadow-sm"
             >
               {interest}
             </span>
           ))}
           {profile.interests.length > 3 && (
-            <span className="px-2 py-1 rounded-full text-[11px] font-medium bg-black/30 border border-white/10 text-slate-400">
+            <span className="px-2 py-1 rounded-full text-[11px] font-medium bg-black/40 border border-white/10 text-coy-sand/70">
               +{profile.interests.length - 3}
             </span>
           )}
