@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS swipes (
 CREATE TABLE IF NOT EXISTS matches (
   user1_id TEXT NOT NULL,
   user2_id TEXT NOT NULL,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  created_at DATETIME DEFAULT (strftime('%Y-%m-%d %H:%M:%f', 'now')),
   PRIMARY KEY (user1_id, user2_id),
   CHECK(user1_id < user2_id),
   FOREIGN KEY (user1_id) REFERENCES profiles(id) ON DELETE CASCADE,
